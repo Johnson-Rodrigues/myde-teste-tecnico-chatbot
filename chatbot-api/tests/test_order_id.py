@@ -1,4 +1,5 @@
-from chatbot_api.app.utils import extract_order_id
+from app.utils import extract_order_id
+
 
 def test_extract_order_id():
     assert extract_order_id("meu pedido é PED-1001") == "PED-1001"
