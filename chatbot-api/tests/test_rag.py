@@ -1,7 +1,6 @@
-import os
 import pytest
 
-from chatbot_api.app.rag import SimpleRAG
+from app.rag import SimpleRAG
 
 
 @pytest.mark.asyncio
