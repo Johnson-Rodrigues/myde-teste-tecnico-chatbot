@@ -76,7 +76,7 @@ ORDERS = {
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "NovaTech Mock API - Pedidos", "version": "1.0.0"}
+    return {"status": "healthy", "service": "NovaTech Mock API - Pedidos", "version": "1.0.0"}
 
 
 @app.get("/api/orders/{order_id}")
