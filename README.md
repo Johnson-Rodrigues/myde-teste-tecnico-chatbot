@@ -120,76 +120,65 @@ A pasta `knowledge-base/` contém 3 documentos:
 
 | Serviço | Porta | Descrição |
 |---------|-------|-----------|
-| `mock-api` | 8001 | Mock da API de pedidos da NovaTech |
+| `mock-api` | 8001 | Mock da API de pedidos |
+| `chatbot-api` | 8000 | API do chatbot (FastAPI) |
 
-Para subir:
+---
+
+## Como rodar (local)
+
+### 1) Configurar variáveis de ambiente
+
+Crie um arquivo `.env` na raiz do repositório (você pode copiar de `.env.example`) e preencha sua chave:
+
 ```bash
-docker-compose up -d
+cp .env.example .env
+# edite o arquivo e preencha OPENAI_API_KEY
 ```
 
----
-
-## O que esperamos na entrega
-
-### Obrigatório
-- [ ] Código fonte em repositório Git
-- [ ] `README.md` com instruções claras para rodar o projeto
-- [ ] Integração com LLM funcionando (OpenAI ou Anthropic)
-- [ ] RAG buscando nos documentos fornecidos e usando o contexto nas respostas
-- [ ] Consulta de pedidos funcionando (via API mock)
-- [ ] Histórico de conversa (multi-turn)
-- [ ] O bot não inventa informações que não estão na base de conhecimento
-
-### Diferenciais (não obrigatórios)
-- [ ] Function calling nativo da API (em vez de parsing manual)
-- [ ] Interface web simples
-- [ ] Testes unitários
-- [ ] Logs estruturados
-- [ ] Tratamento de erros e respostas amigáveis quando a API está fora
-- [ ] Streaming de respostas
-
----
-
-## Critérios de Avaliação
-
-| Critério | Peso | O que avaliamos |
-|----------|------|-----------------|
-| **Qualidade dos prompts** | 30% | System prompt bem elaborado, injeção de contexto, controle de tom e escopo |
-| **RAG** | 30% | Indexação, busca relevante, respostas baseadas nos documentos |
-| **Function calling / Tools** | 20% | Identificação de intenção, extração de dados, integração com API |
-| **Organização do código** | 20% | Estrutura, legibilidade, separação de responsabilidades |
-
----
-
-## Regras
-
-- Prazo: **3 dias corridos** a partir do recebimento (~2h por dia)
-- Linguagem: **Python 3.11+**
-- Você pode usar qualquer biblioteca ou framework (LangChain, LlamaIndex, ou implementação manual)
-- O candidato deve usar sua **própria API key** da OpenAI ou Anthropic
-- O projeto deve funcionar com `docker-compose up` (para o mock) + comando para iniciar o chatbot
-- Em caso de dúvidas, documente suas decisões e premissas no README
-
----
-
-## Como começar
+### 2) Subir os serviços
 
 ```bash
-# 1. Clone este repositório
-git clone <url-do-repositorio>
+docker-compose up -d --build
+```
 
-# 2. Suba o mock de pedidos
-docker-compose up -d
+### 3) Verificar health checks
 
-# 3. Verifique se o mock está rodando
+```bash
+# Mock API
 curl http://localhost:8001/health
 
-# 4. Consulte um pedido de exemplo
-curl http://localhost:8001/api/orders/PED-1001
-
-# 5. Explore a base de conhecimento em knowledge-base/
-
-# 6. Desenvolva sua solução!
+# Chatbot API
+curl http://localhost:8000/health
 ```
 
-Boa sorte!
+### 4) Testar consulta de pedido (mock direto)
+
+```bash
+curl http://localhost:8001/api/orders/PED-1001
+```
+
+### 5) Testar o chatbot
+
+Pergunta de FAQ (RAG):
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"sess-1","message":"Quais formas de pagamento são aceitas?"}'
+```
+
+Consulta de pedido (o bot deve solicitar o pedido ou responder se você enviar o ID):
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"sess-1","message":"Quero saber o status do pedido PED-1001"}'
+```
+
+---
+
+## Observações
+
+- O histórico de conversa é mantido **em memória**, por `session_id` (não persiste entre reinícios).
+- O bot deve responder com base **apenas** no conteúdo de `knowledge-base/`. Caso não encontre, deve informar que não encontrou a resposta na base.
