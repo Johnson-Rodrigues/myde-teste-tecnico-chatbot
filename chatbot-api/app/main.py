@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from openai import AsyncOpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .memory import InMemoryChatHistory
 from .orders_client import OrdersClient
@@ -29,6 +29,24 @@ llm = AsyncOpenAI(api_key=settings.openai_api_key)
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+
+
+class OrderOut(BaseModel):
+    order_id: str
+    customer_name: str
+    status: str
+    status_description: str
+    items: List[str] = Field(default_factory=list)
+    total: float
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    session_id: str
+    answer: str
+    used_order_tool: bool
+    order: Optional[OrderOut] = None
 
 
 @app.on_event("startup")
@@ -80,8 +98,8 @@ async def _answer_with_rag(session_id: str, user_message: str) -> str:
     return resp.choices[0].message.content or ""
 
 
-@app.post("/chat")
-async def chat(request: ChatRequest) -> Dict[str, str]:
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest) -> ChatResponse:
     session_id = request.session_id.strip()
     user_message = request.message.strip()
 
@@ -97,35 +115,58 @@ async def chat(request: ChatRequest) -> Dict[str, str]:
     order_id = extract_order_id(user_message)
     if order_id:
         try:
-            order = await orders_client.get_order(order_id)
+            order_raw: Dict[str, Any] = await orders_client.get_order(order_id)
+            order = OrderOut(**order_raw)
         except ValueError as e:
-            assistant_msg = str(e)
-            history.append(session_id, "assistant", assistant_msg)
-            return {"response": assistant_msg}
-        except Exception:
-            assistant_msg = (
-                "Tive um problema ao consultar seu pedido agora. "
-                "Tente novamente em instantes."
+            answer = str(e)
+            history.append(session_id, "assistant", answer)
+            return ChatResponse(
+                session_id=session_id,
+                answer=answer,
+                used_order_tool=True,
+                order=None,
             )
-            history.append(session_id, "assistant", assistant_msg)
-            return {"response": assistant_msg}
+        except Exception:
+            answer = "Tive um problema ao consultar seu pedido agora. Tente novamente em instantes."
+            history.append(session_id, "assistant", answer)
+            return ChatResponse(
+                session_id=session_id,
+                answer=answer,
+                used_order_tool=True,
+                order=None,
+            )
 
-        assistant_msg = (
-            f"Pedido {order['order_id']} ({order['customer_name']}):\n"
-            f"- Status: {order['status']}\n"
-            f"- Detalhes: {order['status_description']}\n"
-            f"- Itens: {', '.join(order.get('items', []))}\n"
-            f"- Total: R$ {order['total']}"
+        answer = (
+            f"Pedido {order.order_id} ({order.customer_name}):\n"
+            f"- Status: {order.status}\n"
+            f"- Detalhes: {order.status_description}\n"
+            f"- Itens: {', '.join(order.items)}\n"
+            f"- Total: R$ {order.total}"
         )
-        history.append(session_id, "assistant", assistant_msg)
-        return {"response": assistant_msg}
+        history.append(session_id, "assistant", answer)
+        return ChatResponse(
+            session_id=session_id,
+            answer=answer,
+            used_order_tool=True,
+            order=order,
+        )
 
     # If user intent seems order-related but no id, ask for it.
     if "pedido" in user_message.lower() or "status" in user_message.lower():
-        assistant_msg = "Claro! Qual é o número do seu pedido no formato PED-XXXX?"
-        history.append(session_id, "assistant", assistant_msg)
-        return {"response": assistant_msg}
+        answer = "Claro! Qual é o número do seu pedido no formato PED-XXXX?"
+        history.append(session_id, "assistant", answer)
+        return ChatResponse(
+            session_id=session_id,
+            answer=answer,
+            used_order_tool=False,
+            order=None,
+        )
 
-    assistant_msg = await _answer_with_rag(session_id, user_message)
-    history.append(session_id, "assistant", assistant_msg)
-    return {"response": assistant_msg}
+    answer = await _answer_with_rag(session_id, user_message)
+    history.append(session_id, "assistant", answer)
+    return ChatResponse(
+        session_id=session_id,
+        answer=answer,
+        used_order_tool=False,
+        order=None,
+    )

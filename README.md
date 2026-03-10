@@ -160,7 +160,23 @@ curl http://localhost:8001/api/orders/PED-1001
 
 ### 5) Testar o chatbot
 
-Pergunta de FAQ (RAG):
+#### Formato de resposta do `POST /chat`
+
+O endpoint `POST /chat` retorna sempre um JSON no formato:
+
+```json
+{
+  "session_id": "sess-1",
+  "answer": "texto da resposta do assistente",
+  "used_order_tool": false,
+  "order": null
+}
+```
+
+- `used_order_tool`: `true` quando o chatbot consultou o pedido via Mock API.
+- `order`: vem preenchido quando `used_order_tool=true`, caso contrário `null`.
+
+#### Pergunta de FAQ (RAG)
 
 ```bash
 curl -X POST http://localhost:8000/chat \
@@ -168,13 +184,48 @@ curl -X POST http://localhost:8000/chat \
   -d '{"session_id":"sess-1","message":"Quais formas de pagamento são aceitas?"}'
 ```
 
-Consulta de pedido (o bot deve solicitar o pedido ou responder se você enviar o ID):
+Exemplo de resposta (resumo):
+
+```json
+{
+  "session_id": "sess-1",
+  "answer": "…",
+  "used_order_tool": false,
+  "order": null
+}
+```
+
+#### Consulta de pedido
+
+Se você enviar o ID do pedido no formato `PED-XXXX`, o chatbot consulta o mock e retorna `used_order_tool=true` e o objeto `order` preenchido:
 
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id":"sess-1","message":"Quero saber o status do pedido PED-1001"}'
 ```
+
+Exemplo de resposta (resumo):
+
+```json
+{
+  "session_id": "sess-1",
+  "answer": "Pedido PED-1001 (Maria Silva):\n- Status: em_transito\n- Detalhes: …",
+  "used_order_tool": true,
+  "order": {
+    "order_id": "PED-1001",
+    "customer_name": "Maria Silva",
+    "status": "em_transito",
+    "status_description": "Pedido em trânsito — previsão de entrega: 15/03/2026",
+    "items": ["Plano NovaTech Pro — Licença Anual"],
+    "total": 1199.9,
+    "created_at": "2026-02-20T10:30:00Z",
+    "updated_at": "2026-03-05T14:20:00Z"
+  }
+}
+```
+
+Caso o usuário peça “status do pedido” sem informar o ID, o chatbot solicita o número do pedido e retorna `used_order_tool=false`.
 
 ---
 
