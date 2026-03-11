@@ -233,4 +233,4 @@ Caso o usuário peça “status do pedido” sem informar o ID, o chatbot solici
 
 - O histórico de conversa é mantido **em memória**, por `session_id` (não persiste entre reinícios).
 - O bot deve responder com base **apenas** no conteúdo de `knowledge-base/`. Caso não encontre, deve informar que não encontrou a resposta na base.
-- Para rodar é necessário fazer o git clone em repositório local e alterar a API key no arquivo .env
+- Não se esqueça de alterar a API key no arquivo .env
